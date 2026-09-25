@@ -1,8 +1,8 @@
 from database.queries import AsyncORM
 
 
-def init_db():
-    AsyncORM.create_tables()
+async def init_db():
+    await AsyncORM.create_tables()
 
 
 
