@@ -25,13 +25,24 @@ class UserBase(Base):
     tax_rate: Mapped[int]
 
 
+    operation: Mapped[list["OperationBase"]] = relationship(
+        back_populates="user",
+        passive_deletes=True,
+    )
+
+
 
 class OperationBase(Base):
     __tablename__ = "operation"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
     type: Mapped[TypeOperation] = mapped_column(Enum(TypeOperation))
     month: Mapped[int]  # Даты не нужны нужны месяцы, а как их адекватно сохранять хз, можно enum бахнуть, но пока будут циферки
     cost: Mapped[int]
 
+
+    user: Mapped[list["UserBase"]] = relationship(
+        back_populates="operation",
+        passive_deletes=True,
+    )
