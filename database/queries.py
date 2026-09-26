@@ -1,3 +1,7 @@
+import datetime as dt
+
+from sqlalchemy.future import select
+from sqlalchemy import func
 from database.database import engine, session_factory
 from database.models import Base, OperationBase, UserBase
 
@@ -10,28 +14,37 @@ class AsyncORM:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
-
     @staticmethod
     async def add_user(user: UserBase):
-        async with session_factory as session:
-            await session.add(user)
+        async with session_factory() as session:
+            session.add(user)
+            await session.commit()
 
     @staticmethod
     async def qet_user(max_id):
-        async with session_factory as session:
-            await session.query(UserBase).filter_by(max_id=max_id).one_or_none()
+        async with session_factory() as session:
+            stmt = select(UserBase).where(UserBase.max_id == max_id)
+            res = await session.execute(stmt)
+            return res.one_or_none()
 
     @staticmethod
-    async def get_operation(user: UserBase):
-        async with session_factory as session:
-            await session.query(OperationBase).filter_by(user_id=user.id).all()
+    async def get_operations(user_id):
+        async with session_factory() as session:
+            stmt = select(OperationBase).where(OperationBase.user_id == user_id)
+            res = await session.execute(stmt)
+            return res.all()
 
     @staticmethod
     async def add_operation(operation: OperationBase):
-        async with session_factory as session:
-            await session.add(operation)
+        async with session_factory() as session:
+            session.add(operation)
+            await session.commit()
 
     @staticmethod
-    async def sum_income(user: UserBase):
-        pass
+    async def sum_income(user_id, year):
+        async with session_factory() as session:
+            stmt = select(func.sum(OperationBase.cost)).where(OperationBase.user_id == user_id)\
+                .group_by(OperationBase.user_id, OperationBase.year).having(OperationBase.year == year)
+            res = await session.execute(stmt)
+            return res.one_or_none()
 

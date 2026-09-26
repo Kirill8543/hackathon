@@ -30,6 +30,9 @@ class UserBase(Base):
         passive_deletes=True,
     )
 
+    def __repr__(self):
+        return f"id: {self.id}; max_id: {self.max_id}; name: {self.name}; tax_rate: {self.tax_rate}"
+
 
 
 class OperationBase(Base):
@@ -39,6 +42,7 @@ class OperationBase(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
     type: Mapped[TypeOperation] = mapped_column(Enum(TypeOperation))
     month: Mapped[int]  # Даты не нужны нужны месяцы, а как их адекватно сохранять хз, можно enum бахнуть, но пока будут циферки
+    year: Mapped[int]
     cost: Mapped[int]
 
 
@@ -46,3 +50,6 @@ class OperationBase(Base):
         back_populates="operation",
         passive_deletes=True,
     )
+
+    def __repr__(self):
+        return f"id: {self.id}; user_id: {self.user_id}; type: {self.type}; month: {self.month}; year: {self.year}; cost: {self.cost}"
