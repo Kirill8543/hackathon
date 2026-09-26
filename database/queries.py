@@ -1,9 +1,9 @@
 import datetime as dt
 
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from database.database import engine, session_factory
-from database.models import Base, OperationBase, UserBase
+from database.models import Base, OperationBase, UserBase, TypeOperation
 
 class AsyncCore:
     pass
@@ -43,7 +43,8 @@ class AsyncORM:
     @staticmethod
     async def sum_income(user_id, year):
         async with session_factory() as session:
-            stmt = select(func.sum(OperationBase.cost)).where(OperationBase.user_id == user_id)\
+            stmt = select(func.sum(OperationBase.cost))\
+                .where(and_(OperationBase.user_id == user_id, OperationBase.type == TypeOperation.income))\
                 .group_by(OperationBase.user_id, OperationBase.year).having(OperationBase.year == year)
             res = await session.execute(stmt)
             return res.one_or_none()
