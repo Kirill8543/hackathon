@@ -1,13 +1,21 @@
 import datetime as dt
+import holidays
+
 from database.queries import AsyncORM
 from database.models import RateNDS
 from decimal import Decimal
 
 class Payments:
 
+    @staticmethod
+    def next_workday(payment_date: dt.date):
+        ru_holidays = holidays.Russia(years=payment_date.year)
 
+        while payment_date.isoweekday() > 5 or payment_date in ru_holidays:
+            payment_date = dt.timedelta(days=1)
 
-    # По хорошему надо реализовать функцию которая любую дату переделывет в близжайший рабочий день
+        return payment_date
+
     class Fixed:
         @staticmethod
         def date():
@@ -18,12 +26,8 @@ class Payments:
             month = 12
             day = 28
 
-            date = dt.date(today.year, month, day)
+            date = Payments.next_workday(dt.date(today.year, month, day))
 
-            if date.isoweekday() == 6:
-                date = dt.date(today.year, month, day - 1)
-            elif date.isoweekday() == 7:
-                date = dt.date(today.year, month, day + 1)
             if date < today:
                 date = dt.date(today.year + 1, date.month, date.day)
             return date
@@ -47,12 +51,7 @@ class Payments:
             month = 12
             day = 28
 
-            date = dt.date(today.year, month, day)
-
-            if date.isoweekday() == 6:
-                date = dt.date(today.year, month, day - 1)
-            elif date.isoweekday() == 7:
-                date = dt.date(today.year, month, day + 1)
+            date = Payments.next_workday(dt.date(today.year, month, day))
 
             return date
 
@@ -79,14 +78,33 @@ class Payments:
             """
             Возвращает близжаюсшую дату сдачи декларации по НДС за квартал
             """
-            pass
+            today = dt.date.today()
+            months_dec = [4, 7, 10, 13]
+            month = today.month
+            year = today.year
+            day = 25
+            i = 0
+            while i < len(months_dec) and months_dec[i] > month:
+                i += 1
+                month = months_dec[i]
+
+            if month == 13:
+                month = 1
+                year += 1
+
+            date = Payments.next_workday(dt.date(year, month, day))
+
+            return date
 
         @staticmethod
         def date_payment():
             """
             Возвращает дату уплаты НДС равными долями за три месяца (непонятно ниче)
             """
-            pass
+            today = dt.date.today()
+            date = Payments.next_workday(dt.date(day=28, year=today.year, month=today.month))
+            return date
+
 
         @staticmethod
         async def check_nds(max_id) -> tuple:
@@ -100,9 +118,10 @@ class Payments:
 
             (percent, cost_sum, average_cost)
             """
-            income = await AsyncORM.Operation.sum_income(await AsyncORM.User.get_id(max_id),
+            user_id = await AsyncORM.User.get_id(max_id)
+            income = await AsyncORM.Operation.sum_income(user_id,
                                                          dt.date.today().year)
-            avg_income = await AsyncORM.Operation.avg_income(await AsyncORM.User.get_id(max_id),
+            avg_income = await AsyncORM.Operation.avg_income(user_id,
                                                              dt.date.today().year)
             avg_income = Decimal(avg_income)
             avg_income = avg_income.quantize(Decimal("1.00"))
@@ -140,12 +159,7 @@ class Payments:
             if month == 12:
                 month = 4
 
-            date = dt.date(today.year, month, day)
-
-            if date.isoweekday() == 6:
-                date = dt.date(today.year, month, day - 1)
-            elif date.isoweekday() == 7:
-                date = dt.date(today.year, month, day + 1)
+            date = Payments.next_workday(dt.date(today.year, month, day))
 
             return date
 

@@ -12,7 +12,6 @@ class Base(DeclarativeBase):
     pass
 
 class TypeOperation(enum.StrEnum):
-    # Здесь можно добавить еще что-нибудь. Условно обязательный платёж
     income = "доходы"
     expenses = "расходы"
 
