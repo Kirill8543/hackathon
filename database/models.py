@@ -7,14 +7,22 @@ from sqlalchemy import String, ForeignKey, Enum, Text, Date
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
-class TypeOperation(enum.Enum):
+
+class Base(DeclarativeBase):
+    pass
+
+class TypeOperation(enum.StrEnum):
     # Здесь можно добавить еще что-нибудь. Условно обязательный платёж
     income = "доходы"
     expenses = "расходы"
 
-
-class Base(DeclarativeBase):
-    pass
+class PayerNDS(enum.Enum):
+    yes = "yes"
+    no = "no"
+class RateNDS(enum.IntEnum):
+    per_0 = 0
+    per_5 = 5
+    per_22 = 22
 
 class UserBase(Base):
     __tablename__ = "user"
@@ -22,7 +30,8 @@ class UserBase(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     max_id: Mapped[str] # Я хз че макс дает в качестве айдишника у себя надо чекнуть
     name: Mapped[str]
-    tax_rate: Mapped[int]
+    PayerNDS: Mapped[PayerNDS] = mapped_column(Enum(PayerNDS))
+    tax_rate: Mapped[RateNDS] = mapped_column(Enum(RateNDS))
 
 
     operation: Mapped[list["OperationBase"]] = relationship(

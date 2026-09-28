@@ -1,12 +1,13 @@
 import datetime as dt
 from database.queries import AsyncORM
-
+from database.models import RateNDS
+from decimal import Decimal
 
 class Payments:
-    user_id: int
+
+
 
     # По хорошему надо реализовать функцию которая любую дату переделывет в близжайший рабочий день
-
     class Fixed:
         @staticmethod
         def date():
@@ -28,12 +29,12 @@ class Payments:
             return date
 
         @staticmethod
-        def cost() -> int:
+        def cost() -> Decimal:
             """
             Возвращает фиксированную плату
             """
             # По хорошему мы должны спрашивать сколько человек находился в статусе ИП и от этого считать фиксу, но мне лень
-            return 57390
+            return Decimal(57390)
 
     class FixedAdd:
         @staticmethod
@@ -55,13 +56,22 @@ class Payments:
 
             return date
 
-        def cost(self) -> int:
+        @staticmethod
+        async def cost(max_id) -> Decimal:
             """
             Считает дополнительную фиксированную плату, если пересечен порог в 300 тыс.
 
             Если не пересечен порог, то возвращает 0
             """
-            pass
+            income = await AsyncORM.Operation.sum_income(await AsyncORM.User.get_id(max_id),
+                                                         dt.date.today().year)
+            cost = Decimal("0.0")
+            if income > 300000:
+                cost = (income - 300000) * Decimal("0.01")
+                if cost > 321818:
+                    cost = Decimal(321818)
+            return cost
+
 
     class NDS:
         @staticmethod
@@ -78,18 +88,45 @@ class Payments:
             """
             pass
 
-        def check_nds(self) -> tuple:
+        @staticmethod
+        async def check_nds(max_id) -> tuple:
             """
             Возвращает процент использования лимита ндс, использованную сумму денег,
             дату перехода лимита в 20 млн (по среднему)
 
-            (percent, cost_sum, average_cost, date)
+            (percent, cost_sum, average_cost, month)
 
             Если порог пересечен:
 
             (percent, cost_sum, average_cost)
             """
-            pass
+            income = await AsyncORM.Operation.sum_income(await AsyncORM.User.get_id(max_id),
+                                                         dt.date.today().year)
+            avg_income = await AsyncORM.Operation.avg_income(await AsyncORM.User.get_id(max_id),
+                                                             dt.date.today().year)
+            avg_income = Decimal(avg_income)
+            avg_income = avg_income.quantize(Decimal("1.00"))
+
+            percent = (Decimal(income) / 20*10**6) * 100
+            percent = percent.quantize(Decimal("1.00"))
+
+            month = round((20*10**10 - income) / avg_income, 0)
+
+            if month > 12 or month > 12 - dt.date.today().month:
+                month = 0
+
+            return (percent, income, avg_income, month)
+
+
+        @staticmethod
+        async def cost_with_nds(max_id, cost):
+            """
+            Считает цену с ндс
+            """
+            user = await AsyncORM.User.qet(max_id)
+            cost = cost * (1 + Decimal(user.tax_rate) / 100)
+            return cost.quantize(Decimal("1.00"))
+
 
     class USN:
         @staticmethod
@@ -129,12 +166,6 @@ class Payments:
 
 
 
-    @staticmethod
-    def cost_with_nds() -> int:
-        """
-        Считает цену с ндс
-        """
-        pass
 
 
 

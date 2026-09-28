@@ -3,10 +3,12 @@ import datetime as dt
 from sqlalchemy.future import select
 from sqlalchemy import func, and_
 from database.database import engine, session_factory
-from database.models import Base, OperationBase, UserBase, TypeOperation
+from database.models import Base, OperationBase, UserBase, TypeOperation, RateNDS, PayerNDS
 
 class AsyncCore:
     pass
+
+
 class AsyncORM:
 
     @staticmethod
@@ -27,18 +29,27 @@ class AsyncORM:
             async with session_factory() as session:
                 stmt = select(UserBase).where(UserBase.max_id == max_id)
                 res = await session.execute(stmt)
-                return res.one_or_none()
+                return res.scalar_one_or_none()
 
         @staticmethod
-        async def delete(user_id):
+        async def delete(max_id):
             async with session_factory() as session:
-                user = await session.get(UserBase, user_id)
-                session.delete(user)
-                await session.commit()
-
-
-
-
+                user = await AsyncORM.User.qet(max_id)
+                if user:
+                    session.delete(user)
+                    await session.commit()
+        @staticmethod
+        async def update(max_id, rate_nds: RateNDS):
+            async with session_factory() as session:
+                user = await session.get(UserBase, {"max_id": max_id})
+                if user:
+                    user.NDS_payer = PayerNDS.yes
+                    user.tax_rate = rate_nds
+                    await session.commit()
+        @staticmethod
+        async def get_id(max_id):
+            user = await AsyncORM.User.qet(max_id)
+            return user.id
     class Operation:
 
         @staticmethod
@@ -68,7 +79,7 @@ class AsyncORM:
                     .where(and_(OperationBase.user_id == user_id, OperationBase.type == TypeOperation.income)) \
                     .group_by(OperationBase.user_id, OperationBase.year).having(OperationBase.year == year)
                 res = await session.execute(stmt)
-                return res.one_or_none()
+                return res.scalar_one_or_none()
 
         @staticmethod
         async def sum_expenses(user_id, year):
@@ -77,7 +88,17 @@ class AsyncORM:
                     .where(and_(OperationBase.user_id == user_id, OperationBase.type == TypeOperation.expenses)) \
                     .group_by(OperationBase.user_id, OperationBase.year).having(OperationBase.year == year)
                 res = await session.execute(stmt)
-                return res.one_or_none()
+                return res.scalar_one_or_none()
+
+        @staticmethod
+        async def avg_income(user_id, year):
+            async with session_factory() as session:
+                stmt = select(func.avg(OperationBase.cost)) \
+                    .where(and_(OperationBase.user_id == user_id, OperationBase.type == TypeOperation.income)) \
+                    .group_by(OperationBase.user_id, OperationBase.year).having(OperationBase.year == year)
+                res = await session.execute(stmt)
+                return res.scalar_one_or_none()
+
 
 
 
