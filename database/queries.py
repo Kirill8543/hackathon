@@ -3,7 +3,7 @@ import datetime as dt
 from sqlalchemy.future import select
 from sqlalchemy import func, and_
 from database.database import engine, session_factory
-from database.models import Base, OperationBase, UserBase, TypeOperation
+from database.models import Base, OperationBase, UserBase, TypeOperation, RateNDS, PayerNDS
 
 class AsyncCore:
     pass
@@ -39,10 +39,10 @@ class AsyncORM:
                     await session.commit()
 
         @staticmethod
-        async def update(max_id, rate_nds: RateNDS):
+        async def update(max_id, rate_nds: int):
             async with session_factory() as session:
                 user = await session.get(UserBase, {"max_id": max_id})
-                if user:
+                if user and rate_nds != 0:
                     user.NDS_payer = PayerNDS.yes
                     user.tax_rate = rate_nds
                     await session.commit()

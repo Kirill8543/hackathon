@@ -6,7 +6,6 @@ from database.queries import AsyncORM
 from decimal import Decimal
 
 class Payments:
-
     @staticmethod
     def next_workday(payment_date: dt.date):
         ru_holidays = holidays.Russia(years=payment_date.year)

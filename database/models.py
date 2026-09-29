@@ -12,6 +12,14 @@ class TypeOperation(enum.Enum):
     income = "доходы"
     expenses = "расходы"
 
+class PayerNDS(enum.Enum):
+    yes = "yes"
+    no = "no"
+class RateNDS(enum.IntEnum):
+    per_0 = 0
+    per_5 = 5
+    per_7 = 7
+    per_22 = 22
 
 class Base(DeclarativeBase):
     pass
