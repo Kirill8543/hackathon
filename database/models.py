@@ -41,7 +41,7 @@ class OperationBase(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
     type: Mapped[TypeOperation] = mapped_column(Enum(TypeOperation))
-    month: Mapped[int]  # Даты не нужны нужны месяцы, а как их адекватно сохранять хз, можно enum бахнуть, но пока будут циферки
+    month: Mapped[int]
     year: Mapped[int]
     cost: Mapped[int]
 

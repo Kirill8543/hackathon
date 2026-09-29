@@ -1,180 +1,165 @@
 import datetime as dt
+import holidays
+
 from database.queries import AsyncORM
 
+from decimal import Decimal
 
 class Payments:
-    user_id: int
 
     @staticmethod
-    def _get_next_working_day(date: dt.date) -> dt.date:
-        """
-        Переносит дату на следующий рабочий день, если она выпадает на выходной.
-        (Суббота -> Понедельник, Воскресенье -> Понедельник).
-        Примечание: для учета официальных праздников РФ рекомендуется использовать
-        внешнюю библиотеку, например, production_calendar.
-        """
-        if date.isoweekday() == 6:  # Суббота
-            return date + dt.timedelta(days=2)
-        elif date.isoweekday() == 7:  # Воскресенье
-            return date + dt.timedelta(days=1)
-        return date
+    def next_workday(payment_date: dt.date):
+        ru_holidays = holidays.Russia(years=payment_date.year)
 
-    @staticmethod
-    def date_prepayment_usn() -> dt.date:
-        """
-        Возвращает ближайшую дату уплаты аванса УСН (28 число месяца, следующего за кварталом).
-        """
-        today = dt.date.today()
-        month = (today.month // 4) * 4 + 4
-        day = 28
+        while payment_date.isoweekday() > 5 or payment_date in ru_holidays:
+            payment_date = dt.timedelta(days=1)
 
-        if month > 12:
-            month = 4
-            year = today.year + 1
-        else:
+        return payment_date
+
+    class Fixed:
+        @staticmethod
+        def date():
+            """
+            Возвращает дату уплаты фиксированного платежа
+            """
+            today = dt.date.today()
+            month = 12
+            day = 28
+
+            date = Payments.next_workday(dt.date(today.year, month, day))
+
+            if date < today:
+                date = dt.date(today.year + 1, date.month, date.day)
+            return date
+
+        @staticmethod
+        def cost() -> Decimal:
+            """
+            Возвращает фиксированную плату
+            """
+            # По хорошему мы должны спрашивать сколько человек находился в статусе ИП и от этого считать фиксу, но мне лень
+            return Decimal(57390)
+
+    class FixedAdd:
+        @staticmethod
+        def date():
+            """
+            Возвращает дату дополнительной части
+            уплаты фиксированного платежа
+            """
+            today = dt.date.today()
+            month = 12
+            day = 28
+
+            date = Payments.next_workday(dt.date(today.year, month, day))
+
+            return date
+
+        @staticmethod
+        async def cost(max_id) -> Decimal:
+            """
+            Считает дополнительную фиксированную плату, если пересечен порог в 300 тыс.
+
+            Если не пересечен порог, то возвращает 0
+            """
+            income = await AsyncORM.Operation.sum_income(await AsyncORM.User.get_id(max_id),
+                                                         dt.date.today().year)
+            cost = Decimal("0.0")
+            if income > 300000:
+                cost = (income - 300000) * Decimal("0.01")
+                if cost > 321818:
+                    cost = Decimal(321818)
+            return cost
+
+
+    class NDS:
+        @staticmethod
+        def date_declaration():
+            """
+            Возвращает близжаюсшую дату сдачи декларации по НДС за квартал
+            """
+            today = dt.date.today()
+            months_dec = [4, 7, 10, 13]
+            month = today.month
             year = today.year
+            day = 25
+            i = 0
+            while i < len(months_dec) and months_dec[i] > month:
+                i += 1
+                month = months_dec[i]
 
-        date = dt.date(year, month, day)
-        return Payments._get_next_working_day(date)
-
-    @staticmethod
-    def date_fix_payment() -> dt.date:
-        """
-        Возвращает дату уплаты фиксированного платежа (до 31 декабря, обычно 28-е).
-        """
-        today = dt.date.today()
-        month, day = 12, 28
-
-        date = dt.date(today.year, month, day)
-        date = Payments._get_next_working_day(date)
-
-        if date < today:
-            date = dt.date(today.year + 1, month, day)
-            date = Payments._get_next_working_day(date)
-
-        return date
-
-    @staticmethod
-    def date_add_fix_payment() -> dt.date:
-        """
-        Возвращает дату уплаты дополнительной части фиксированного платежа
-        (1% с дохода свыше 300 тыс.) — 1 июля года, следующего за отчетным.
-        """
-        today = dt.date.today()
-        date = dt.date(today.year + 1, 7, 1)
-        return Payments._get_next_working_day(date)
-
-    @staticmethod
-    def date_declaration_nds() -> dt.date:
-        """
-        Возвращает ближайшую дату сдачи декларации по НДС за квартал
-        (25 число месяца, следующего за кварталом).
-        """
-        today = dt.date.today()
-        quarter_month = ((today.month - 1) // 3) * 3 + 3
-        year = today.year
-
-        next_month = quarter_month + 1
-        if next_month > 12:
-            next_month = 1
-            year += 1
-
-        date = Payments._get_next_working_day(dt.date(year, next_month, 25))
-
-        if date < today:
-            next_month += 3
-            if next_month > 12:
-                next_month -= 12
+            if month == 13:
+                month = 1
                 year += 1
-            date = Payments._get_next_working_day(dt.date(year, next_month, 25))
 
-        return date
+            date = Payments.next_workday(dt.date(year, month, day))
 
-    @staticmethod
-    def date_payment_nds() -> tuple[dt.date, dt.date, dt.date]:
-        """
-        Возвращает кортеж из трех дат уплаты НДС равными долями за три месяца,
-        следующих за отчетным кварталом (28 число каждого месяца).
-        """
-        today = dt.date.today()
-        quarter_month = ((today.month - 1) // 3) * 3 + 3
-        year = today.year
+            return date
 
-        dates = []
-        for i in range(1, 4):
-            month = quarter_month + i
-            y = year
-            if month > 12:
-                month -= 12
-                y += 1
-            dates.append(Payments._get_next_working_day(dt.date(y, month, 28)))
+        @staticmethod
+        def date_payment():
+            """
+            Возвращает дату уплаты НДС равными долями за три месяца (непонятно ниче)
+            """
+            today = dt.date.today()
+            date = Payments.next_workday(dt.date(day=28, year=today.year, month=today.month))
+            return date
 
-        # Если весь цикл платежей за этот квартал уже прошел, сдвигаем на следующий
-        if dates[-1] < today:
-            dates = []
-            for i in range(1, 4):
-                month = quarter_month + i + 3
-                y = year
-                while month > 12:
-                    month -= 12
-                    y += 1
-                dates.append(Payments._get_next_working_day(dt.date(y, month, 28)))
 
-        return tuple(dates)
+        @staticmethod
+        async def check_nds(max_id) -> tuple:
+            """
+            Возвращает процент использования лимита ндс, использованную сумму денег,
+            дату перехода лимита в 20 млн (по среднему)
 
-    async def check_nds(self) -> tuple:
-        """
-        Возвращает процент использования лимита НДС, использованную сумму денег,
-        дату перехода лимита в 20 млн (по среднему).
+            (percent, cost_sum, average_cost, month)
 
-        (percent, cost_sum, average_cost, date)
-        Если порог пересечен: (percent, cost_sum, average_cost)
-        """
-        limit = 20000000
+            Если порог пересечен:
 
-        cost_sum = await AsyncORM.get_total_income(self.user_id) if hasattr(AsyncORM, 'get_total_income') else 0
-        average_cost = await AsyncORM.get_average_monthly_income(self.user_id) if hasattr(AsyncORM, 'get_average_monthly_income') else 0
+            (percent, cost_sum, average_cost)
+            """
+            user_id = await AsyncORM.User.get_id(max_id)
+            income = await AsyncORM.Operation.sum_income(user_id,
+                                                         dt.date.today().year)
+            avg_income = await AsyncORM.Operation.avg_income(user_id,
+                                                             dt.date.today().year)
+            avg_income = Decimal(avg_income)
+            avg_income = avg_income.quantize(Decimal("1.00"))
 
-        percent = round((cost_sum / limit) * 100, 2) if limit > 0 else 0.0
+            percent = (Decimal(income) / 20*10**6) * 100
+            percent = percent.quantize(Decimal("1.00"))
 
-        if cost_sum >= limit:
-            return percent, cost_sum, average_cost
+            month = round((20*10**10 - income) / avg_income, 0)
 
-        if average_cost > 0:
-            months_left = (limit - cost_sum) / average_cost
-            target_date = dt.date.today() + dt.timedelta(days=int(months_left * 30.44))
-        else:
-            target_date = None
+            if month > 12 or month > 12 - dt.date.today().month:
+                month = 0
 
-        return percent, cost_sum, average_cost, target_date
+            return (percent, income, avg_income, month)
 
-    async def add_fix_payment(self) -> int:
-        """
-        Считает дополнительную фиксированную плату, если пересечен порог в 300 тыс.
-        Если не пересечен порог, возвращает 0.
-        """
-        limit = 300000
 
-        income = await AsyncORM.get_total_income(self.user_id) if hasattr(AsyncORM, 'get_total_income') else 0
+        @staticmethod
+        async def cost_with_nds(max_id, cost):
+            """
+            Считает цену с ндс
+            """
+            user = await AsyncORM.User.qet(max_id)
+            cost = cost * (1 + Decimal(user.tax_rate) / 100)
+            return cost.quantize(Decimal("1.00"))
 
-        if income > limit:
-            extra = int((income - limit) * 0.01)
-            return extra
 
-        return 0
+    class USN:
+        @staticmethod
+        def date_prepayment():
+            """
+            Возвращает ближайшую дату уплаты аванса усн
+            """
+            today = dt.date.today()
+            month = today.month // 4 * 4 + 4
+            day = 28
+            if month == 12:
+                month = 4
 
-    @staticmethod
-    def fix_payment() -> int:
-        """
-        Возвращает базовую фиксированную плату.
-        """
-        return 57390
+            date = Payments.next_workday(dt.date(today.year, month, day))
 
-    @staticmethod
-    def cost_with_nds(cost: float | int) -> float:
-        """
-        Считает цену с НДС (20%).
-        Примечание: добавлен аргумент `cost`, так как статический метод не может
-        вычислить стоимость без входных данных.
-        """
-        return round(cost * 1.2, 2)
+            return date
+
