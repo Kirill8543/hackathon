@@ -11,7 +11,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U svetofor -d svetofor_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d svetofor_db"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,12 +23,11 @@ services:
       db:
         condition: service_healthy
     env_file:
-      - core/settings.env
+      - ./core/settings.env
     environment:
-      
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: svetofor
+      DB_USER: postgres              # ← теперь совпадает с POSTGRES_USER
       DB_PASS: svetofor_secret
       DB_NAME: svetofor_db
       SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
