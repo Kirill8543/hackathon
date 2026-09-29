@@ -41,7 +41,7 @@ class AsyncORM:
         @staticmethod
         async def update(max_id, rate_nds: int):
             async with session_factory() as session:
-                user = await session.get(UserBase, {"max_id": max_id})
+                user = await AsyncORM.User.qet(max_id)
                 if user and rate_nds != 0:
                     user.NDS_payer = PayerNDS.yes
                     user.tax_rate = rate_nds
