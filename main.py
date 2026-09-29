@@ -14,7 +14,7 @@ async def lifespan():
     print("Работаем, братья!")
     print("Starting bot...")
 
-    print("Сервису жёпа!!!")
+    print("Не готов!!!")
     yield
 
 app = FastAPI()
