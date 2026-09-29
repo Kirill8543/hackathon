@@ -29,4 +29,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file="core/settings.env")
 
 
+class CostRequest(BaseModel):
+    cost: float | int
+
+
 settings = Settings()
