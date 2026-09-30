@@ -1,12 +1,4 @@
-"""Бот «Светофор НДС» для MAX — один файл.
 
-Импортирует логику из logic.py (Payments, AsyncORM, модели).
-Запуск: python bot.py  (long polling, без домена и SSL).
-
-ИСПРАВЛЕНО: kb() и main_kb() теперь всегда возвращают list[Attachment],
-а не одиночный Attachment. Это Fixes ошибку:
-  'tuple' object has no attribute 'model_dump'
-"""
 
 import asyncio
 import logging
@@ -30,9 +22,7 @@ from database.models import (UserBase, OperationBase,
     TypeOperation, RateNDS,)
 from database.queries import AsyncORM
 
-# ═══════════════════════════════════════════════════════════
-#  Настройка
-# ═══════════════════════════════════════════════════════════
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -52,9 +42,7 @@ MONTHS_PRED = [
     "июля", "августа", "сентября", "октября", "ноября", "декабря",
 ]
 
-# ═══════════════════════════════════════════════════════════
-#  FSM — состояния пользователя
-# ═══════════════════════════════════════════════════════════
+
 class S(Enum):
     INCOME_2025    = "income_2025"
     WAIT_INCOME    = "wait_income"
@@ -86,11 +74,7 @@ class FSM:
 
 fsm = FSM()
 
-# ═══════════════════════════════════════════════════════════
-#  Клавиатуры — ВСЕГДА возвращают list[Attachment]
-#  (не одиночный Attachment! — иначе maxapi падает с
-#   'tuple' object has no attribute 'model_dump')
-# ═══════════════════════════════════════════════════════════
+
 def _btn(text: str, payload: str, intent=Intent.DEFAULT) -> CallbackButton:
     return CallbackButton(text=text, payload=payload, intent=intent)
 
@@ -108,9 +92,7 @@ def main_kb() -> list:
         [("Календарь", "calendar"), ("Источники", "sources")],
     )
 
-# ═══════════════════════════════════════════════════════════
-#  Утилиты форматирования
-# ═══════════════════════════════════════════════════════════
+
 def fmt_money(n) -> str:
     """13_200_000 -> '13,2 млн ₽', 500_000 -> '500 000 ₽'."""
     n = int(n or 0)
@@ -136,9 +118,7 @@ def safe_int(text: str) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
-# ═══════════════════════════════════════════════════════════
-#  Обёртки над logic.py
-# ═══════════════════════════════════════════════════════════
+
 async def ensure_user(max_id: str, name: str = "Пользователь") -> bool:
     user = await AsyncORM.User.qet(max_id)
     if user:
@@ -215,9 +195,7 @@ async def next_unfilled_month(max_id: str, year: int = YEAR_TRACK) -> Optional[i
         logging.error(f"next_unfilled_month: {e}")
         return None
 
-# ═══════════════════════════════════════════════════════════
-#  Экран 3: Светофор
-# ═══════════════════════════════════════════════════════════
+
 async def show_semafor(max_id: str, chat_id: int):
     st = await nds_status(max_id)
     pct = st["percent"]
@@ -271,9 +249,7 @@ async def show_semafor(max_id: str, chat_id: int):
         attachments=main_kb(),
     )
 
-# ═══════════════════════════════════════════════════════════
-#  Экран 7: Календарь
-# ═══════════════════════════════════════════════════════════
+
 async def show_calendar(max_id: str, chat_id: int):
     lines = ["Ваши ближайшие сроки:\n"]
 
@@ -333,9 +309,7 @@ async def show_calendar(max_id: str, chat_id: int):
         ),
     )
 
-# ═══════════════════════════════════════════════════════════
-#  Экран 8: Источники
-# ═══════════════════════════════════════════════════════════
+
 SOURCES = (
     "📋 Источники и допущения\n\n"
     "Все цифры и правила — из методических рекомендаций ФНС\n"
@@ -350,9 +324,7 @@ SOURCES = (
     "  ставки 0%/10%, крупные обороты 272,5–490,5 млн ₽"
 )
 
-# ═══════════════════════════════════════════════════════════
-#  Экран 0: /start
-# ═══════════════════════════════════════════════════════════
+
 @dp.bot_started()
 async def on_started(event: BotStarted):
     chat_id = event.chat.chat_id if hasattr(event, "chat") \
@@ -382,9 +354,7 @@ async def cmd_start(event: MessageCreated):
         attachments=kb([("Начать", "start_ob")]),
     )
 
-# ═══════════════════════════════════════════════════════════
-#  Обработка inline-кнопок
-# ═══════════════════════════════════════════════════════════
+
 @dp.message_callback()
 async def on_callback(event: MessageCallback):
     payload = event.callback.payload
@@ -564,9 +534,7 @@ async def on_callback(event: MessageCallback):
         )
 
 
-# ═══════════════════════════════════════════════════════════
-#  Вспомогательная — запрос дохода 2025
-# ═══════════════════════════════════════════════════════════
+
 async def _ask_2025(chat_id: int, max_id: str):
     fsm.set(max_id, S.INCOME_2025)
     await bot.send_message(
@@ -575,9 +543,6 @@ async def _ask_2025(chat_id: int, max_id: str):
              "(просто числом, например: 5000000)",
     )
 
-# ═══════════════════════════════════════════════════════════
-#  Обработка текстовых сообщений
-# ═══════════════════════════════════════════════════════════
 @dp.message_created()
 async def on_text(event: MessageCreated):
     max_id = str(event.from_user.user_id)
@@ -777,9 +742,7 @@ async def on_text(event: MessageCreated):
                 text="Нажмите /start, чтобы начать.",
             )
 
-# ═══════════════════════════════════════════════════════════
-#  Запуск
-# ═══════════════════════════════════════════════════════════
+
 async def main():
     logging.info("Бот «Светофор НДС» запускается…")
     await database.init_db()
