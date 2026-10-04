@@ -1,0 +1,53 @@
+version: 1
+project: svetofor-nds
+
+# ── Переменные проекта (видны всем контейнерам) ──
+environment:
+  variables:
+    POSTGRES_USER: svetofor
+    POSTGRES_PASSWORD: svetofor_secret
+    POSTGRES_DB: svetofor_db
+
+# ── Сетевой диск для PostgreSQL ──
+volumes:
+  pg_data:
+    type: ssd
+    size: 1GiB
+
+# ── Контейнеры ──
+containers:
+  # База данных
+  db:
+    image: postgres:16-alpine
+    replicas: 1
+    resources:
+      memory: 256MiB
+      cpu: 1
+      cpuFraction: 5
+    variables:
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_DB: $POSTGRES_DB
+    volumes:
+      - name: pg_data
+        mountPath: /var/lib/postgresql/data
+    state: started
+
+  # Бот
+  bot:
+    image: ""  # собирается из Dockerfile при Push-to-Deploy
+    replicas: 1
+    resources:
+      memory: 128MiB
+      cpu: 1
+      cpuFraction: 5
+    variables:
+      DB_HOST: db           # имя контейнера БД внутри сети Dockhost
+      DB_PORT: 5432
+      DB_USER: $POSTGRES_USER
+      DB_PASS: $POSTGRES_PASSWORD
+      DB_NAME: $POSTGRES_DB
+      VK_MAX_TOKEN: вад_токен_из_MAX
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+      REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+    state: started
